@@ -8,11 +8,13 @@ aggregate_table <- function(vals) {
 # bit_match takes a dataframe, a set of covariates to match on, the
 # treatment indicator column and the matched indicator column. it returns the
 # array indicating whether each unit is matched (the first return value), and a
-# list of indices for the matched units (the second return value)
+# list of indices for the matched units (the second return value). The dataframe
+# should have a matched indicator column.
 
 bit_match <- function(data, covs) {
   # gmp::as.bigz is for handling lots and lots of covariates so we don't
   # have trouble with overflow issues
+  # -1 for matched indicator column
   n_levels <- sapply(data[, covs, drop = FALSE], nlevels) - 1
   data_wo_t <- gmp::as.bigz(as.matrix(data[, covs[order(n_levels)]]))
   n_levels <- sort(n_levels) # isn't this already sorted?
@@ -23,10 +25,10 @@ bit_match <- function(data, covs) {
   b_u <- as.vector(gmp::`%*%`(data_wo_t, multiplier))
 
   # Compute b_u+
-  multiplier <- gmp::pow.bigz(n_levels, seq_along(n_levels))
-
   b_u_plus <-
-    as.vector(gmp::add.bigz(gmp::`%*%`(data_wo_t, multiplier), data$treated))
+    gmp::mul.bigz(b_u, as.bigz(n_levels)) %>%
+    gmp::add.bigz(data$treated) %>%
+    as.vector()
 
   # Compute c_u
   c_u <- aggregate_table(b_u)
